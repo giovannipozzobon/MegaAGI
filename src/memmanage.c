@@ -8,7 +8,6 @@
 #include <math.h>
 
 #include "memmanage.h"
-
 uint8_t __far * const chipmem_base = (uint8_t __far *)0x40000;
 static uint16_t chipmem_allocoffset;
 

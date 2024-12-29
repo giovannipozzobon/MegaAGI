@@ -25,6 +25,8 @@ int main () {
   VICIV.screencol = COLOR_BLACK;
   VICIV.key = 0x47;
   VICIV.key = 0x53;
+  VICIV.chrxscl = 120;
+  simplewrite(0x93);
   simplewrite(0x0b);
   simplewrite(0x0e);
   simpleprint("AGI DEMO!\r");
@@ -36,8 +38,7 @@ int main () {
   simpleprint("LOADING DIRECTORY FILES...\r");
   load_directory_files();
 
-  hook_irq();
-
+  VICIV.sdbdrwd_msb = VICIV.sdbdrwd_msb & ~(VIC4_HOTREG_MASK);
   run_loop();
 
   return 0;

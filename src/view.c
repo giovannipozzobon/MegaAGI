@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <calypsi/intrinsics6502.h>
 #include <mega65.h>
@@ -15,10 +16,12 @@
 uint8_t view_backbuf[1024];
 int16_t pos_x;
 int16_t pos_y;
+bool dirty;
 volatile uint8_t view_w;
 volatile uint8_t view_h;
 #define ASCIIKEY (*(volatile uint8_t *)0xd610)
 volatile uint8_t was_mirrored;
+extern volatile uint8_t drawing_screen;
 
 uint8_t get_priority(uint8_t y) {
     if (y == 168) {
@@ -72,7 +75,7 @@ void draw_cel_forward(uint8_t __far *cel_data, int16_t x, int16_t y) {
         uint8_t pixcnt = cel_data[cel_offset] & 0x0f;
         if ((pixcol == 0) && (pixcnt == 0)) {
             for (; cur_x < right_side; cur_x++) {
-                view_backbuf[pixel_offset] = gfx_get(0, cur_x, cur_y);
+                view_backbuf[pixel_offset] = gfx_get(drawing_screen, cur_x, cur_y);
                 pixel_offset++;
             }
             cur_x = x;
@@ -80,12 +83,12 @@ void draw_cel_forward(uint8_t __far *cel_data, int16_t x, int16_t y) {
             draw_row++;
         } else {
             for (uint8_t count = 0; count < pixcnt; count++) {
-                view_backbuf[pixel_offset] = gfx_get(0, cur_x, cur_y);
+                view_backbuf[pixel_offset] = gfx_get(drawing_screen, cur_x, cur_y);
                 pixel_offset++;
                 if (pixcol != view_trans) {
-                    uint8_t pix_prio = gfx_getprio(cur_x, cur_y);
+                    uint8_t pix_prio = gfx_getprio(drawing_screen + 1, cur_x, cur_y);
                     if (objprio >= pix_prio) {
-                        gfx_plotput(0, cur_x, cur_y, pixcol);
+                        gfx_plotput(drawing_screen, cur_x, cur_y, pixcol);
                     }
                 }
                 cur_x++;
@@ -110,7 +113,7 @@ void draw_cel_backward(uint8_t __far *cel_data, int16_t x, int16_t y) {
         uint8_t pixcnt = cel_data[cel_offset] & 0x0f;
         if ((pixcol == 0) && (pixcnt == 0)) {
             for (; cur_x >= x; cur_x--) {
-                view_backbuf[pixel_offset] = gfx_get(0, cur_x, cur_y);
+                view_backbuf[pixel_offset] = gfx_get(drawing_screen, cur_x, cur_y);
                 pixel_offset++;
             }
             cur_x = right_side;
@@ -118,12 +121,12 @@ void draw_cel_backward(uint8_t __far *cel_data, int16_t x, int16_t y) {
             draw_row++;
         } else {
             for (uint8_t count = 0; count < pixcnt; count++) {
-                view_backbuf[pixel_offset] = gfx_get(0, cur_x, cur_y);
+                view_backbuf[pixel_offset] = gfx_get(drawing_screen, cur_x, cur_y);
                 pixel_offset++;
                 if (pixcol != view_trans) {
-                    uint8_t pix_prio = gfx_getprio(cur_x, cur_y);
+                    uint8_t pix_prio = gfx_getprio(drawing_screen + 1, cur_x, cur_y);
                     if (objprio >= pix_prio) {
-                        gfx_plotput(0, cur_x, cur_y, pixcol);
+                        gfx_plotput(drawing_screen, cur_x, cur_y, pixcol);
                     }
                 }
                 cur_x--;
@@ -153,27 +156,32 @@ void draw_cel(uint16_t loop_offset, uint8_t loop_index, uint8_t cel, uint8_t x, 
         draw_cel_backward(cel_data, x, y);
         was_mirrored = 1;
     }
+    dirty = true;
 }
 
 void erase_view(void) {
+    if (!dirty) {
+        return;
+    }
     uint16_t pixel_offset = 0;
     uint8_t right_side = pos_x + view_w;
     uint8_t bottom_side = pos_y + view_h;
     if (was_mirrored) {
         for (int16_t cur_y = pos_y; cur_y < bottom_side; cur_y++) {
             for (int16_t cur_x = right_side; cur_x >= pos_x; cur_x--) {
-                gfx_plotput(0, cur_x, cur_y, view_backbuf[pixel_offset]);
+                gfx_plotput(drawing_screen, cur_x, cur_y, view_backbuf[pixel_offset]);
                 pixel_offset++;
             }
         }
     } else {
         for (uint8_t cur_y = pos_y; cur_y < bottom_side; cur_y++) {
             for (uint8_t cur_x = pos_x; cur_x < right_side; cur_x++) {
-                gfx_plotput(0, cur_x, cur_y, view_backbuf[pixel_offset]);
+                gfx_plotput(drawing_screen, cur_x, cur_y, view_backbuf[pixel_offset]);
                 pixel_offset++;
             }
         }
     }
+    dirty = false;
 }
 
 uint8_t get_num_cels(uint16_t loop_offset) {
@@ -212,5 +220,6 @@ uint16_t load_view(uint8_t view_num) {
     for (uint16_t counter = 0; counter < length; counter++) {
         view_target[counter] = view_file[counter];
     }
+    dirty = false;
     return view_offset;
 }

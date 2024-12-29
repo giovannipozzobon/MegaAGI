@@ -27,7 +27,6 @@ volatile uint8_t view_x = 40;
 volatile uint8_t view_y = 40;
 volatile int8_t view_dx = 0;
 volatile int8_t view_dy = 0;
-volatile uint8_t color_number = 0;
 volatile uint16_t loop_offset;
 volatile uint8_t loop_count;
 volatile uint8_t cel_count;
@@ -44,6 +43,9 @@ static uint8_t last_columnzero;
 static uint8_t keypress_f5;
 static uint8_t object_dir;
 static uint8_t loop_index;
+volatile uint8_t drawing_screen = 2;
+volatile uint8_t viewing_screen = 0;
+volatile uint8_t frame_dirty;
 
 void autoselect_loop(void) {
     if (loop_count == 1) {
@@ -252,6 +254,15 @@ void handle_movement_keys(void) {
     }
 }*/
 
+void draw_sprite(void) {
+    erase_view();
+    cel_index++;
+    if (cel_index == cel_count) {
+        cel_index = 0;
+    }
+    draw_cel(loop_offset, loop_index, cel_index, view_x, view_y);
+}
+
 void parse_debug_command(char *command) {
     char *cmd = strtok(command, " ");
     if (0 == strcmp(cmd, "PIC")) {
@@ -262,8 +273,13 @@ void parse_debug_command(char *command) {
         view_dx = 0;
         view_dy = 0;
         uint8_t pic_num = atoi(arg);
-        draw_pic(pic_num, 0);
+        draw_pic(drawing_screen, pic_num, 0);
         draw_cel(loop_offset, loop_index, 0, view_x, view_y);
+        drawing_screen ^= viewing_screen;
+        viewing_screen ^= drawing_screen;
+        drawing_screen ^= viewing_screen;
+        gfx_showgfx(viewing_screen);
+        gfx_copygfx(viewing_screen);
     } else if (0 == strcmp(cmd, "SOUND")) {
         char *arg = strtok(NULL, " ");
         if (arg == NULL) {
@@ -272,13 +288,12 @@ void parse_debug_command(char *command) {
         uint8_t sound_num = atoi(arg);
         play_sound(sound_num);
     } else if (0 == strcmp(cmd, "VIEW")) {
-        __disable_interrupts();
         char *arg = strtok(NULL, " ");
         if (arg == NULL) {
             return;
         }
-        view_sprite = atoi(arg);
         erase_view();
+        view_sprite = atoi(arg);
         view_dx = 0;
         view_dy = 0;
         view_x = 40;
@@ -291,18 +306,18 @@ void parse_debug_command(char *command) {
         cel_count = get_num_cels(loop_offset);
         cel_index = 0;
         loop_index = 0;
-        draw_cel(loop_offset, loop_index, 0, view_x, view_y);
-        __enable_interrupts();
+        draw_sprite();
+        frame_dirty = 1;
     }
 }
 
 void run_loop(void) {
-    static char command_buffer[16];
+    static char command_buffer[38];
     static uint8_t cmd_buf_ptr = 0;
 
     gfx_switchto();
-    draw_pic(picture, 0);
-    gfx_print_parserline('\r');
+    draw_pic(0, picture, 0);
+    gfx_copygfx(0);
     view_offset = load_view(view_sprite);
     loop_count = get_num_loops(view_offset);
     object_dir = 0;
@@ -310,29 +325,56 @@ void run_loop(void) {
     cel_count = get_num_cels(loop_offset);
     cel_index = 0;
     loop_index = 0;
-    draw_cel(loop_offset, loop_index, 0, view_x, view_y);
+    gfx_print_parserline('\r');
+    gfx_showgfx(0);
+    hook_irq();
+    draw_sprite();
+    frame_dirty = 0;
     while (1) {
         handle_movement_joystick();
-        if (ASCIIKEY != 0) {
-            uint8_t petscii = PETSCIIKEY;
-            ASCIIKEY = 0;
-            if (petscii == 0x14) {
-                if (cmd_buf_ptr > 0) {
-                    cmd_buf_ptr--;
+        if (frame_counter == 0) {
+            if (ASCIIKEY != 0) {
+                uint8_t petscii = PETSCIIKEY;
+                ASCIIKEY = 0;
+                if (petscii == 0x14) {
+                    if (cmd_buf_ptr > 0) {
+                        cmd_buf_ptr--;
+                        gfx_print_parserline(petscii);
+                    }
+                } else if (petscii == 0x0d) {
+                    command_buffer[cmd_buf_ptr] = 0;
+                    parse_debug_command(command_buffer);
+                    cmd_buf_ptr=0;
                     gfx_print_parserline(petscii);
-                }
-            } else if (petscii == 0x0d) {
-                command_buffer[cmd_buf_ptr] = 0;
-                parse_debug_command(command_buffer);
-                cmd_buf_ptr=0;
-                gfx_print_parserline(petscii);
-            } else {
-                if (cmd_buf_ptr < 15) {
-                    command_buffer[cmd_buf_ptr] = petscii;
-                    gfx_print_parserline(petscii);
-                    cmd_buf_ptr++;
+                } else {
+                    if (cmd_buf_ptr < 37) {
+                        command_buffer[cmd_buf_ptr] = petscii;
+                        gfx_print_parserline(petscii);
+                        cmd_buf_ptr++;
+                    }
                 }
             }
+
+            view_x += view_dx;
+            view_y += view_dy;
+            if (view_x == 255) {
+                view_x = 0;
+                view_dx = 0;
+            } else if (view_y == 255) {
+                view_y = 0;
+                view_dy = 0;
+            } else if (view_x > (160 - view_w)) {
+                view_x = 160 - view_w;
+                view_dx = 0;
+            } else if (view_y > (167 - view_h)) {
+                view_y = 167 - view_h;
+                view_dy = 0;
+            }
+            if ((view_dx != 0) || (view_dy != 0)) {
+                draw_sprite();
+                frame_dirty = 1;
+            }
+            while(frame_dirty);
         }
     }
 }
@@ -343,28 +385,12 @@ void engine_interrupt_handler(void) {
         return;
     }
     frame_counter = 0;
-    color_number++;
-    view_x += view_dx;
-    view_y += view_dy;
-    if (view_x == 255) {
-        view_x = 0;
-        view_dx = 0;
-    } else if (view_y == 255) {
-        view_y = 0;
-        view_dy = 0;
-    } else if (view_x > (160 - view_w)) {
-        view_x = 160 - view_w;
-        view_dx = 0;
-    } else if (view_y > (168 - view_h)) {
-        view_y = 168 - view_h;
-        view_dy = 0;
-    }
-    if ((view_dx != 0) || (view_dy != 0)) {
-        erase_view();
-        cel_index++;
-        if (cel_index == cel_count) {
-            cel_index = 0;
-        }
-        draw_cel(loop_offset, loop_index, cel_index, view_x, view_y);
+    if (frame_dirty) {
+        drawing_screen ^= viewing_screen;
+        viewing_screen ^= drawing_screen;
+        drawing_screen ^= viewing_screen;
+        gfx_showgfx(viewing_screen);
+        gfx_copygfx(viewing_screen);
+        frame_dirty = 0;
     }
 }

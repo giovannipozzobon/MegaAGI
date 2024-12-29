@@ -25,7 +25,7 @@ static    uint8_t priority_on;
 static uint8_t last_relative_x;
 static uint8_t last_relative_y;
 static uint16_t fill_pointer;
-static uint8_t cur_drawmode;
+static uint8_t drawing_screen;
 
 #pragma clang section bss="extradata"
 __far static fill_info_t fills[128];
@@ -33,46 +33,19 @@ __far static fill_info_t fills[128];
 
 void pset(uint8_t x, uint8_t y) {
     if (pic_on) {
-        gfx_plotput(0, x, y, pic_color);
+        gfx_plotput(drawing_screen, x, y, pic_color);
     }
     if (priority_on) {
-        gfx_plotput(1, x, y, priority_color);
+        gfx_plotput(drawing_screen+1, x, y, priority_color);
     }
 }
 
 void draw_line(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2) {
-    if ((x1 == x2) || (y1 == y2)) {
-        if (cur_drawmode == 0) {
-            if (pic_on) {
-                gfx_drawslowline(0, x1, y1, x2, y2, pic_color);
-            }
-            if (priority_on) {
-                gfx_drawslowline(1, x1, y1, x2, y2, priority_color);
-            }
-        } else {
-            if (pic_on) {
-                gfx_drawfastline(0, x1, y1, x2, y2, pic_color);
-            }
-            if (priority_on) {
-                gfx_drawfastline(1, x1, y1, x2, y2, priority_color);
-            }
-        }
-    } else {
-        if (cur_drawmode == 2) {
-            if (pic_on) {
-                gfx_drawfastline(0, x1, y1, x2, y2, pic_color);
-            }
-            if (priority_on) {
-                gfx_drawfastline(1, x1, y1, x2, y2, priority_color);
-            }
-        } else {
-            if (pic_on) {
-                gfx_drawslowline(0, x1, y1, x2, y2, pic_color);
-            }
-            if (priority_on) {
-                gfx_drawslowline(1, x1, y1, x2, y2, priority_color);
-            }
-        }
+    if (pic_on) {
+        gfx_drawslowline(drawing_screen, x1, y1, x2, y2, pic_color);
+    }
+    if (priority_on) {
+        gfx_drawslowline(drawing_screen+1, x1, y1, x2, y2, priority_color);
     }
 }
 
@@ -104,9 +77,9 @@ uint8_t can_fill(uint8_t x, uint8_t y) {
         return 0;
     }
     if (pic_on == 0) {
-        return (gfx_get(1, x, y) == 4);
+        return (gfx_get(drawing_screen + 1, x, y) == 4);
     }
-    return (gfx_get(0, x, y) == 15);
+    return (gfx_get(drawing_screen, x, y) == 15);
 }
 
 uint8_t draw_fill(uint8_t in_x, uint8_t in_y) {
@@ -165,7 +138,9 @@ uint8_t draw_fill(uint8_t in_x, uint8_t in_y) {
     return max_depth;
 }
 
-uint8_t draw_pic(uint8_t pic_num, uint8_t draw_mode) {
+uint8_t draw_pic(uint8_t screen_num, uint8_t pic_num, uint8_t draw_mode) {
+    drawing_screen = screen_num;
+    gfx_cleargfx(drawing_screen);
     uint8_t max_depth = 1;
     uint8_t __huge *pic_file;
     uint16_t length;
@@ -174,10 +149,8 @@ uint8_t draw_pic(uint8_t pic_num, uint8_t draw_mode) {
         return 0;
     }
 
-    gfx_setupmem();
     pic_on = 0;
     priority_on = 0;
-    cur_drawmode = draw_mode;
     uint16_t index = 0;
     do {
         uint8_t command = pic_file[index];

@@ -3,6 +3,9 @@
             .extern _InterruptChain
 
 VECTOR:     .equlab 0xff8d
+LINESTEPL:  .equlab 0xd058
+CHRXSCL:    .equlab 0xd05a
+CHRCOUNT:   .equlab 0xd05e
 
             .section code
 
@@ -11,6 +14,9 @@ vectab:     .space 56
             .align 256
             .public basepage
 basepage:   .space 256
+
+irqlvl:
+            .space 1
 
             .public hook_irq
 hook_irq:  
@@ -34,6 +40,10 @@ hook_irq:
             ldy #.byte1 vectab
             clc
             jsr VECTOR
+
+            lda #0x1b
+            sta 0xd011
+
             cli
 
             rts
@@ -59,5 +69,46 @@ unhook_irq:
 
             .public _irq_rt
 _irq_rt:
+            lda irqlvl
+            bne _irq_rt_background
+
+            .public _irq_rt_splitscr
+_irq_rt_splitscr:
+            lda #0xff
+            sta 0xd012
+
+            lda 0xd012
+waitraster:
+            cmp 0xd012
+            beq waitraster
+
+            lda #120
+            sta CHRXSCL
+            lda #40
+            sta CHRCOUNT
+            lda #80
+            sta LINESTEPL
+
+            lda #0x01
+            sta irqlvl
+            
+            jmp (_InterruptChain)
+
+            .public _irq_rt_background
+_irq_rt_background:
+
+            lda #0xC2
+            sta 0xd012
+
+            lda #60
+            sta CHRXSCL
+            lda #20
+            sta CHRCOUNT
+            lda #40
+            sta LINESTEPL
+
+            lda #0x00
+            sta irqlvl
+
             jmp irq_handler
 

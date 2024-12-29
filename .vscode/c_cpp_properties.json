@@ -1,33 +1,21 @@
 {
     "configurations": [
         {
-            "name": "Win32",
-            "includePath": [
-                "${workspaceFolder}/**"
-            ],
-            "defines": [
-                "_DEBUG",
-                "UNICODE",
-                "_UNICODE"
-            ],
-            "windowsSdkVersion": "10.0.22621.0",
-            "compilerPath": "cl.exe",
-            "cStandard": "c17",
-            "cppStandard": "c++17",
-            "intelliSenseMode": "windows-msvc-x64"
-        },
-        {
             "name": "MEGA65",
             "includePath": [
                 "${workspaceFolder}/**",
-                "C:\\Program Files (x86)\\Calypsi-6502\\include"
+                "C:\\Program Files (x86)\\Calypsi-6502\\include",
+                "C:\\Program Files (x86)\\Calypsi-6502\\contrib\\MEGA65-SDK\\include"
             ],
             "defines": [
                 "_DEBUG",
                 "UNICODE",
-                "_UNICODE"
+                "_UNICODE",
+                "__INT8_TYPE__ = char",
+                "__UINT8_TYPE__ = unsigned char",
+                "__INT16_TYPE__ = short",
+                "__UINT16_TYPE__ = unsigned short"
             ],
-            "windowsSdkVersion": "10.0.22621.0",
             "compilerPath": "C:\\Program Files (x86)\\Calypsi-6502\\bin\\cc6502.exe",
             "cStandard": "c17",
             "cppStandard": "c++17",

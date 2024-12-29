@@ -18,6 +18,15 @@
             "label": "clean",
             "type": "shell",
             "command": "make -k clean",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "problemMatcher": []
          }
     ]
 }
