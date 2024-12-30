@@ -134,6 +134,7 @@ void parse_debug_command(char *command) {
         if (arg == NULL) {
             return;
         }
+        sprite_erase(0);
         sprite_set_direction(0,0);
         uint8_t pic_num = atoi(arg);
         draw_pic(drawing_screen, pic_num, 0);
