@@ -6,11 +6,13 @@
 #include <mega65.h>
 
 #include "gfx.h"
+#include "irq.h"
 #include "pic.h"
 #include "sound.h"
 #include "view.h"
 #include "volume.h"
 #include "simplefile.h"
+#include "sprite.h"
 #include "memmanage.h"
 
 #define ASCIIKEY (*(volatile uint8_t *)0xd610)
@@ -19,20 +21,9 @@
 #define POKE(X, Y) (*(volatile uint8_t*)(X)) = Y
 #define PEEK(X) (*(volatile uint8_t*)(X))
 
-extern uint8_t view_w;
-extern uint8_t view_h;
-
-static uint8_t view_sprite = 0;
 volatile uint8_t view_x = 40;
 volatile uint8_t view_y = 40;
-volatile int8_t view_dx = 0;
-volatile int8_t view_dy = 0;
-volatile uint16_t loop_offset;
-volatile uint8_t loop_count;
-volatile uint8_t cel_count;
-volatile uint8_t cel_index;
 volatile uint8_t frame_counter;
-static uint16_t view_offset;
 static uint8_t picture = 1;
 static uint8_t keypress_up;
 static uint8_t keypress_down;
@@ -41,80 +32,9 @@ static uint8_t keypress_right;
 static uint8_t last_cursorreg;
 static uint8_t last_columnzero;
 static uint8_t keypress_f5;
-static uint8_t object_dir;
-static uint8_t loop_index;
 volatile uint8_t drawing_screen = 2;
 volatile uint8_t viewing_screen = 0;
 volatile uint8_t frame_dirty;
-
-void autoselect_loop(void) {
-    if (loop_count == 1) {
-        return;
-    }
-    if (loop_count < 4) {
-        switch(object_dir) {
-            case 2:
-            loop_index = 0;
-            loop_offset = select_loop(view_offset, 0);
-            break;
-            case 3:
-            loop_index = 0;
-            loop_offset = select_loop(view_offset, 0);
-            break;
-            case 4:
-            loop_index = 0;
-            loop_offset = select_loop(view_offset, 0);
-            break;
-            case 6:
-            loop_index = 1;
-            loop_offset = select_loop(view_offset, 1);
-            break;
-            case 7:
-            loop_index = 1;
-            loop_offset = select_loop(view_offset, 1);
-            break;
-            case 8:
-            loop_index = 1;
-            loop_offset = select_loop(view_offset, 1);
-            break;
-        }
-    } else {
-        switch(object_dir) {
-            case 1:
-            loop_index = 3;
-            loop_offset = select_loop(view_offset, 3);
-            break;
-            case 2:
-            loop_index = 0;
-            loop_offset = select_loop(view_offset, 0);
-            break;
-            case 3:
-            loop_index = 0;
-            loop_offset = select_loop(view_offset, 0);
-            break;
-            case 4:
-            loop_index = 0;
-            loop_offset = select_loop(view_offset, 0);
-            break;
-            case 5:
-            loop_index = 2;
-            loop_offset = select_loop(view_offset, 2);
-            break;
-            case 6:
-            loop_index = 1;
-            loop_offset = select_loop(view_offset, 1);
-            break;
-            case 7:
-            loop_index = 1;
-            loop_offset = select_loop(view_offset, 1);
-            break;
-            case 8:
-            loop_index = 1;
-            loop_offset = select_loop(view_offset, 1);
-            break;
-        }
-    }
-}
 
 /*
     0000 = inv
@@ -135,49 +55,6 @@ void autoselect_loop(void) {
     1111 = inv
 */
 
-void set_object_motions(void) {
-    __disable_interrupts();
-    switch (object_dir) {
-        case 0:
-        view_dx = 0;
-        view_dy = 0;
-        break;
-        case 1:
-        view_dx = 0;
-        view_dy = -1;
-        break;
-        case 2:
-        view_dx = 1;
-        view_dy = -1;
-        break;
-        case 3:
-        view_dx = 1;
-        view_dy = 0;
-        break;
-        case 4:
-        view_dx = 1;
-        view_dy = 1;
-        break;
-        case 5:
-        view_dx = 0;
-        view_dy = 1;
-        break;
-        case 6:
-        view_dx = -1;
-        view_dy = 1;
-        break;
-        case 7:
-        view_dx = -1;
-        view_dy = 0;
-        break;
-        case 8:
-        view_dx = -1;
-        view_dy = -1;
-        break;
-    }
-    __enable_interrupts();
-}
-
 void handle_movement_joystick(void) {
     const uint8_t joystick_direction[16] = {
         0, 0, 0, 0, 0, 4, 2, 3,
@@ -185,11 +62,7 @@ void handle_movement_joystick(void) {
     };
     uint8_t port2joy = PEEK(0xDC00) & 0x0f;
     uint8_t new_object_dir = joystick_direction[port2joy];
-    if (new_object_dir != object_dir) {
-        object_dir = new_object_dir;
-        set_object_motions();
-        autoselect_loop();
-    }
+    sprite_set_direction(0, new_object_dir);
 }
 
 /*
@@ -254,15 +127,6 @@ void handle_movement_keys(void) {
     }
 }*/
 
-void draw_sprite(void) {
-    erase_view();
-    cel_index++;
-    if (cel_index == cel_count) {
-        cel_index = 0;
-    }
-    draw_cel(loop_offset, loop_index, cel_index, view_x, view_y);
-}
-
 void parse_debug_command(char *command) {
     char *cmd = strtok(command, " ");
     if (0 == strcmp(cmd, "PIC")) {
@@ -270,11 +134,10 @@ void parse_debug_command(char *command) {
         if (arg == NULL) {
             return;
         }
-        view_dx = 0;
-        view_dy = 0;
+        sprite_set_direction(0,0);
         uint8_t pic_num = atoi(arg);
         draw_pic(drawing_screen, pic_num, 0);
-        draw_cel(loop_offset, loop_index, 0, view_x, view_y);
+        sprite_draw(0);
         drawing_screen ^= viewing_screen;
         viewing_screen ^= drawing_screen;
         drawing_screen ^= viewing_screen;
@@ -292,21 +155,11 @@ void parse_debug_command(char *command) {
         if (arg == NULL) {
             return;
         }
-        erase_view();
-        view_sprite = atoi(arg);
-        view_dx = 0;
-        view_dy = 0;
-        view_x = 40;
-        view_y = 40;
-        chipmem_free(view_offset);
-        view_offset = load_view(view_sprite);
-        loop_count = get_num_loops(view_offset);
-        object_dir = 0;
-        loop_offset = select_loop(view_offset, 0);
-        cel_count = get_num_cels(loop_offset);
-        cel_index = 0;
-        loop_index = 0;
-        draw_sprite();
+        sprite_erase(0);
+        uint8_t view_number = atoi(arg);
+        sprite_set_position(0, 40, 40);
+        sprite_set_view(0, view_number);
+        sprite_draw(0);
         frame_dirty = 1;
     }
 }
@@ -318,18 +171,14 @@ void run_loop(void) {
     gfx_switchto();
     draw_pic(0, picture, 0);
     gfx_copygfx(0);
-    view_offset = load_view(view_sprite);
-    loop_count = get_num_loops(view_offset);
-    object_dir = 0;
-    loop_offset = select_loop(view_offset, 0);
-    cel_count = get_num_cels(loop_offset);
-    cel_index = 0;
-    loop_index = 0;
+    sprite_set_view(0, 0);
+    sprite_set_position(0, 120, 120);
     gfx_print_parserline('\r');
     gfx_showgfx(0);
     hook_irq();
-    draw_sprite();
-    frame_dirty = 0;
+    sprite_draw(0);
+    frame_dirty = 1;
+    while(frame_dirty);
     while (1) {
         handle_movement_joystick();
         if (frame_counter == 0) {
@@ -355,23 +204,8 @@ void run_loop(void) {
                 }
             }
 
-            view_x += view_dx;
-            view_y += view_dy;
-            if (view_x == 255) {
-                view_x = 0;
-                view_dx = 0;
-            } else if (view_y == 255) {
-                view_y = 0;
-                view_dy = 0;
-            } else if (view_x > (160 - view_w)) {
-                view_x = 160 - view_w;
-                view_dx = 0;
-            } else if (view_y > (167 - view_h)) {
-                view_y = 167 - view_h;
-                view_dy = 0;
-            }
-            if ((view_dx != 0) || (view_dy != 0)) {
-                draw_sprite();
+            if (sprite_move(0)) {
+                sprite_draw(0);
                 frame_dirty = 1;
             }
             while(frame_dirty);

@@ -14,8 +14,6 @@
 #include "view.h"
 
 uint8_t view_backbuf[1024];
-int16_t pos_x;
-int16_t pos_y;
 bool dirty;
 volatile uint8_t view_w;
 volatile uint8_t view_h;
@@ -89,7 +87,7 @@ void draw_cel_forward(uint8_t __far *cel_data, int16_t x, int16_t y) {
                     uint8_t pix_prio = gfx_getprio(drawing_screen + 1, cur_x, cur_y);
                     if (objprio >= pix_prio) {
                         gfx_plotput(drawing_screen, cur_x, cur_y, pixcol);
-                    }
+                   }
                 }
                 cur_x++;
             }
@@ -137,9 +135,6 @@ void draw_cel_backward(uint8_t __far *cel_data, int16_t x, int16_t y) {
 }
 
 void draw_cel(uint16_t loop_offset, uint8_t loop_index, uint8_t cel, uint8_t x, uint8_t y) {
-    pos_x = x;
-    pos_y = y;
-
     uint8_t __far *loop_data = chipmem_base + loop_offset;
     uint8_t __far *cell_ptr = loop_data + (cel * 2) + 1;
     uint16_t cel_base = *cell_ptr | ((*(cell_ptr + 1)) << 8);
@@ -159,23 +154,23 @@ void draw_cel(uint16_t loop_offset, uint8_t loop_index, uint8_t cel, uint8_t x, 
     dirty = true;
 }
 
-void erase_view(void) {
+void erase_view(int16_t x, int16_t y) {
     if (!dirty) {
         return;
     }
     uint16_t pixel_offset = 0;
-    uint8_t right_side = pos_x + view_w;
-    uint8_t bottom_side = pos_y + view_h;
+    uint8_t right_side = x + view_w;
+    uint8_t bottom_side = y + view_h;
     if (was_mirrored) {
-        for (int16_t cur_y = pos_y; cur_y < bottom_side; cur_y++) {
-            for (int16_t cur_x = right_side; cur_x >= pos_x; cur_x--) {
+        for (int16_t cur_y = y; cur_y < bottom_side; cur_y++) {
+            for (int16_t cur_x = right_side; cur_x >= x; cur_x--) {
                 gfx_plotput(drawing_screen, cur_x, cur_y, view_backbuf[pixel_offset]);
                 pixel_offset++;
             }
         }
     } else {
-        for (uint8_t cur_y = pos_y; cur_y < bottom_side; cur_y++) {
-            for (uint8_t cur_x = pos_x; cur_x < right_side; cur_x++) {
+        for (uint8_t cur_y = y; cur_y < bottom_side; cur_y++) {
+            for (uint8_t cur_x = x; cur_x < right_side; cur_x++) {
                 gfx_plotput(drawing_screen, cur_x, cur_y, view_backbuf[pixel_offset]);
                 pixel_offset++;
             }
