@@ -4,8 +4,8 @@
             "name": "MEGA65",
             "includePath": [
                 "${workspaceFolder}/**",
-                "C:\\Program Files (x86)\\Calypsi-6502\\include",
-                "C:\\Program Files (x86)\\Calypsi-6502\\contrib\\MEGA65-SDK\\include"
+                "/usr/local/lib/calypsi-6502/include",
+                "/usr/local/lib/calypsi-6502/contrib/MEGA65-SDK/include"
             ],
             "defines": [
                 "_DEBUG",
@@ -16,7 +16,7 @@
                 "__INT16_TYPE__ = short",
                 "__UINT16_TYPE__ = unsigned short"
             ],
-            "compilerPath": "C:\\Program Files (x86)\\Calypsi-6502\\bin\\cc6502.exe",
+            "compilerPath": "/usr/local/lib/calypsi-6502/bin/cc6502",
             "cStandard": "c17",
             "cppStandard": "c++17",
             "intelliSenseMode": "windows-msvc-x64"

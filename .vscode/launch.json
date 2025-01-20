@@ -6,24 +6,20 @@
     "configurations": [
         {
             "name": "(Windows) Launch",
-            "type": "cppvsdbg",
+            "type": "lldb",
             "request": "launch",
-            "program": "C:\\Program Files\\xemu\\xmega65.exe",
+            "program": "/Applications/Mega65/bin/xmega65",
             "args": ["-8", ".\\agi.d81", "-uartmon", ":4510"],
-            "stopAtEntry": false,
             "cwd": "${workspaceRoot}",
-            "environment": [],
             "console": "internalConsole"
         },
         {
             "name": "(MEGA65) Launch",
-            "type": "cppvsdbg",
+            "type": "lldb",
             "request": "launch",
-            "program": "C:\\CommandLineApps\\etherload.exe",
+            "program": "/Applications/m65tools/etherload.osx",
             "args": ["-r", "-m", "agi.d81", "-5", "--ntsc", "agi.prg"],
-            "stopAtEntry": false,
             "cwd": "${workspaceRoot}",
-            "environment": [],
             "console": "internalConsole"
         },
    ]

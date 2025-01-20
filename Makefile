@@ -36,8 +36,8 @@ agi.d81: agi.prg
 	$(C1541) -attach agi.d81 -write volumes/SNDDIR snddir,s
 	$(C1541) -attach agi.d81 -write volumes/VIEWDIR viewdir,s
 	$(C1541) -attach agi.d81 -write volumes/VOL.0 vol.0,s
-	$(C1541) -attach agi.d81 -write volumes/VOL.1 vol.1,s
-	$(C1541) -attach agi.d81 -write volumes/VOL.2 vol.2,s
+#	$(C1541) -attach agi.d81 -write volumes/VOL.1 vol.1,s
+#	$(C1541) -attach agi.d81 -write volumes/VOL.2 vol.2,s
 
 clean:
 	-rm $(OBJS) $(OBJS:%.o=%.lst) $(OBJS_DEBUG) $(OBJS_DEBUG:%.o=%.lst)

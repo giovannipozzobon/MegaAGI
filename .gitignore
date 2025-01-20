@@ -3,3 +3,6 @@ obj/*.lst
 *.lst
 *.prg
 
+agi.d81
+.DS_Store
+src/.source.txt
